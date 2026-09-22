@@ -2,52 +2,147 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  >
+
   <title>RJAB Mini App</title>
+
+  <!-- Telegram Mini App SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+
   <style>
-    html,body{margin:0;padding:0;width:100%;height:100%;font-family:Arial,sans-serif;background:#fff;}
-    .wrap{height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;box-sizing:border-box;}
-    .box{max-width:420px;}
-    .title{font-size:22px;font-weight:700;margin-bottom:10px;}
-    .text{font-size:15px;line-height:1.5;color:#666;}
-    .error{color:#b00020;font-weight:600;}
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+    }
+
+    .wrap {
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .box {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #111111;
+    }
+
+    .text {
+      font-size: 15px;
+      line-height: 1.5;
+      color: #666666;
+      white-space: pre-line;
+      word-break: break-word;
+    }
+
+    .error {
+      color: #b00020;
+      font-weight: 600;
+    }
   </style>
 </head>
+
 <body>
+
   <div class="wrap">
     <div class="box">
-      <div class="title">RJAB Sales Performance</div>
-      <div id="status" class="text">Connecting to Telegram...</div>
+
+      <div class="title">
+        RJAB Sales Performance
+      </div>
+
+      <div id="status" class="text">
+        Connecting to Telegram...
+      </div>
+
     </div>
   </div>
 
+
   <script>
   (function () {
+
     "use strict";
+
 
     // ==========================================================
     // RJAB MAIN MINI APP BRIDGE
     // ==========================================================
-    // This page must be hosted on a normal HTTPS web host, NOT
-    // inside Google Apps Script HtmlService.
-    // It captures Telegram's initData before redirecting to the
-    // existing Apps Script dashboard.
+    //
+    // Telegram
+    //    ↓
+    // GitHub Pages Mini App
+    //    ↓
+    // Apps Script Dashboard
+    //
+    // This page captures Telegram's authenticated initData
+    // and passes it unchanged to the Apps Script Web App.
+    //
+    // IMPORTANT:
+    // Do NOT use initDataUnsafe as the authentication source.
+    // It is only used here to obtain convenience values such
+    // as Telegram ID / start parameter.
+    //
     // ==========================================================
+
 
     var APPS_SCRIPT_URL =
       "https://script.google.com/macros/s/AKfycbwviJA0gD49t3OC1FwTVkk-ehUy52rhP4yZiiW71FxoyW64D3vw8NQgPjpsPlIdI9iaQA/exec";
 
-    var status = document.getElementById("status");
+
+    var status =
+      document.getElementById("status");
+
+
+    // ==========================================================
+    // STATUS
+    // ==========================================================
 
     function setStatus(message, isError) {
-      if (!status) return;
-      status.textContent = message;
-      status.className = isError ? "text error" : "text";
+
+      if (!status) {
+        return;
+      }
+
+      status.textContent =
+        String(message || "");
+
+      status.className =
+        isError
+          ? "text error"
+          : "text";
     }
 
-    function getTelegramData() {
+
+    // ==========================================================
+    // TELEGRAM WEB APP
+    // ==========================================================
+
+    function getWebApp() {
+
       try {
+
         if (
           typeof Telegram === "undefined" ||
           !Telegram.WebApp
@@ -55,132 +150,443 @@
           return null;
         }
 
-        var webApp = Telegram.WebApp;
+        return Telegram.WebApp;
 
-        try {
-          webApp.ready();
-          if (typeof webApp.expand === "function") {
-            webApp.expand();
-          }
-        } catch (e) {}
+      } catch (err) {
 
-        var initData = String(
-          webApp.initData || ""
-        ).trim();
+        return null;
 
-        var user =
-          webApp.initDataUnsafe &&
-          webApp.initDataUnsafe.user
-            ? webApp.initDataUnsafe.user
-            : null;
+      }
+    }
 
-        var telegramId = user && user.id
-          ? String(user.id).trim()
-          : "";
 
-        var startParam =
-          webApp.initDataUnsafe &&
-          webApp.initDataUnsafe.start_param
-            ? String(webApp.initDataUnsafe.start_param).trim()
-            : "";
+    // ==========================================================
+    // GET TELEGRAM DATA
+    // ==========================================================
 
-        // Fallback: parse the raw initData if the unsafe object
-        // is not populated for this Telegram client/version.
-        if (initData) {
-          try {
-            var params = new URLSearchParams(initData);
+    function getTelegramData() {
 
-            if (!telegramId) {
-              var userJson = params.get("user") || "";
-              if (userJson) {
-                var parsedUser = JSON.parse(userJson);
-                if (parsedUser && parsedUser.id) {
-                  telegramId = String(parsedUser.id).trim();
-                }
-              }
-            }
+      try {
 
-            if (!startParam) {
-              startParam = String(
-                params.get("start_param") || ""
-              ).trim();
-            }
-          } catch (e2) {}
+        var webApp =
+          getWebApp();
+
+        if (!webApp) {
+          return null;
         }
 
+
+        // Tell Telegram that the Mini App is ready.
+        try {
+
+          if (
+            typeof webApp.ready === "function"
+          ) {
+            webApp.ready();
+          }
+
+        } catch (e1) {}
+
+
+        // Expand the Mini App.
+        try {
+
+          if (
+            typeof webApp.expand === "function"
+          ) {
+            webApp.expand();
+          }
+
+        } catch (e2) {}
+
+
+        // ------------------------------------------------------
+        // AUTHENTICATED RAW INIT DATA
+        // ------------------------------------------------------
+
+        var initData =
+          String(
+            webApp.initData || ""
+          ).trim();
+
+
+        // ------------------------------------------------------
+        // UNSAFE USER OBJECT
+        // Used only to obtain the Telegram ID.
+        // Server validation still uses initData.
+        // ------------------------------------------------------
+
+        var user = null;
+
+        try {
+
+          if (
+            webApp.initDataUnsafe &&
+            webApp.initDataUnsafe.user
+          ) {
+
+            user =
+              webApp.initDataUnsafe.user;
+
+          }
+
+        } catch (e3) {}
+
+
+        var telegramId =
+          user && user.id
+            ? String(user.id).trim()
+            : "";
+
+
+        // ------------------------------------------------------
+        // START PARAMETER
+        // ------------------------------------------------------
+
+        var startParam = "";
+
+        try {
+
+          if (
+            webApp.initDataUnsafe &&
+            webApp.initDataUnsafe.start_param
+          ) {
+
+            startParam =
+              String(
+                webApp.initDataUnsafe.start_param
+              ).trim();
+
+          }
+
+        } catch (e4) {}
+
+
+        // ------------------------------------------------------
+        // FALLBACK: READ USER + START PARAM FROM INIT DATA
+        // ------------------------------------------------------
+
+        if (initData) {
+
+          try {
+
+            var params =
+              new URLSearchParams(initData);
+
+
+            // Telegram ID fallback
+
+            if (!telegramId) {
+
+              var userJson =
+                params.get("user") || "";
+
+              if (userJson) {
+
+                try {
+
+                  var parsedUser =
+                    JSON.parse(userJson);
+
+                  if (
+                    parsedUser &&
+                    parsedUser.id
+                  ) {
+
+                    telegramId =
+                      String(
+                        parsedUser.id
+                      ).trim();
+
+                  }
+
+                } catch (userError) {}
+
+              }
+
+            }
+
+
+            // Start parameter fallback
+
+            if (!startParam) {
+
+              startParam =
+                String(
+                  params.get("start_param") || ""
+                ).trim();
+
+            }
+
+          } catch (parseError) {}
+
+        }
+
+
         return {
+
           initData: initData,
+
           telegramId: telegramId,
+
           startParam: startParam
+
         };
+
       } catch (err) {
+
         return null;
+
       }
+
     }
+
+
+    // ==========================================================
+    // LAUNCH APPS SCRIPT
+    // ==========================================================
 
     function launch() {
-      var data = getTelegramData();
+
+      var data =
+        getTelegramData();
+
+
+      // --------------------------------------------------------
+      // TELEGRAM SDK NOT AVAILABLE
+      // --------------------------------------------------------
 
       if (!data) {
+
         setStatus(
-          "Telegram Mini App session was not detected. Please reopen the Mini App from Telegram.",
+          "Telegram Mini App session was not detected.\n\n" +
+          "Please close this window and reopen the dashboard from Telegram.",
           true
         );
+
         return;
+
       }
 
-      if (!data.initData || !data.telegramId) {
+
+      // --------------------------------------------------------
+      // INIT DATA NOT AVAILABLE
+      // --------------------------------------------------------
+
+      if (!data.initData) {
+
         setStatus(
-          "Telegram account data was not received. Please close and reopen the Mini App from Telegram.",
+          "Telegram authentication data was not received.\n\n" +
+          "Please close the Mini App and open it again from Telegram.",
           true
         );
+
         return;
+
       }
 
-      setStatus("Opening dashboard...");
 
-      var url = APPS_SCRIPT_URL +
-        "?telegramId=" + encodeURIComponent(data.telegramId) +
-        "&initData=" + encodeURIComponent(data.initData);
+      // --------------------------------------------------------
+      // TELEGRAM ID NOT AVAILABLE
+      // --------------------------------------------------------
+
+      if (!data.telegramId) {
+
+        setStatus(
+          "Telegram user ID was not detected.\n\n" +
+          "Please close the Mini App and open it again from Telegram.",
+          true
+        );
+
+        return;
+
+      }
+
+
+      // --------------------------------------------------------
+      // BUILD APPS SCRIPT URL
+      // --------------------------------------------------------
+
+      var url =
+        APPS_SCRIPT_URL +
+        "?telegramId=" +
+        encodeURIComponent(
+          data.telegramId
+        ) +
+        "&initData=" +
+        encodeURIComponent(
+          data.initData
+        );
+
 
       if (data.startParam) {
-        url += "&startParam=" +
-          encodeURIComponent(data.startParam);
+
+        url +=
+          "&startParam=" +
+          encodeURIComponent(
+            data.startParam
+          );
+
       }
 
+
+      // --------------------------------------------------------
+      // OPEN DASHBOARD
+      // --------------------------------------------------------
+
+      setStatus(
+        "Opening dashboard..."
+      );
+
+
+      /*
+       * IMPORTANT:
+       * Do not modify initData before sending it.
+       * encodeURIComponent() is only for safely placing the
+       * complete initData string inside the URL query parameter.
+       */
+
       window.location.replace(url);
+
     }
 
-    // Telegram may populate the WebApp object immediately or shortly
-    // after the page starts. Retry briefly, but never bypass validation.
+
+    // ==========================================================
+    // BOOT
+    // ==========================================================
+
     var attempts = 0;
 
+    var maxAttempts = 40;
+
+    var retryDelay = 250;
+
+
     function boot() {
+
       attempts++;
 
-      var data = getTelegramData();
+
+      var data =
+        getTelegramData();
+
+
+      // --------------------------------------------------------
+      // SUCCESS
+      // --------------------------------------------------------
+
       if (
         data &&
         data.initData &&
         data.telegramId
       ) {
+
         launch();
+
         return;
+
       }
 
-      if (attempts < 20) {
-        setTimeout(boot, 250);
+
+      // --------------------------------------------------------
+      // RETRY
+      // --------------------------------------------------------
+
+      if (
+        attempts < maxAttempts
+      ) {
+
+        setTimeout(
+          boot,
+          retryDelay
+        );
+
         return;
+
       }
+
+
+      // --------------------------------------------------------
+      // FAILED
+      // --------------------------------------------------------
+
+      var webApp =
+        getWebApp();
+
+
+      var sdkDetected =
+        !!webApp;
+
+
+      var initDataLength = 0;
+
+      var detectedTelegramId = "";
+
+
+      try {
+
+        if (webApp) {
+
+          initDataLength =
+            String(
+              webApp.initData || ""
+            ).length;
+
+
+          if (
+            webApp.initDataUnsafe &&
+            webApp.initDataUnsafe.user &&
+            webApp.initDataUnsafe.user.id
+          ) {
+
+            detectedTelegramId =
+              String(
+                webApp.initDataUnsafe.user.id
+              );
+
+          }
+
+        }
+
+      } catch (debugError) {}
+
 
       setStatus(
-        "Telegram account data was not received. Please close and reopen the Mini App from Telegram.",
+
+        "Telegram Mini App could not initialize.\n\n" +
+
+        "SDK detected: " +
+        (sdkDetected ? "YES" : "NO") +
+        "\n" +
+
+        "initData length: " +
+        initDataLength +
+        "\n" +
+
+        "Telegram ID detected: " +
+        (
+          detectedTelegramId
+            ? "YES"
+            : "NO"
+        ) +
+        "\n\n" +
+
+        "Please close the Mini App and open it again from Telegram.",
+
         true
+
       );
+
     }
 
+
+    // Start
+
     boot();
+
+
   })();
   </script>
+
 </body>
 </html>
