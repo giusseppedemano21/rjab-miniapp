@@ -205,6 +205,49 @@
     // GET TELEGRAM DATA
     // ==========================================================
 
+    function getRJABLocationInitData() {
+
+      try {
+
+        var sources = [
+          String(window.location.hash || "").replace(/^#/, ""),
+          String(window.location.search || "").replace(/^\?/, "")
+        ];
+
+        for (var i = 0; i < sources.length; i++) {
+
+          if (!sources[i]) {
+            continue;
+          }
+
+          var params =
+            new URLSearchParams(sources[i]);
+
+          var raw =
+            params.get("tgWebAppData") || "";
+
+          if (raw) {
+
+            return String(raw).trim();
+
+          }
+
+        }
+
+      } catch (err) {
+
+        console.warn(
+          "RJAB Mini App location initData error:",
+          err
+        );
+
+      }
+
+      return "";
+
+    }
+
+
     function getTelegramData() {
 
       try {
@@ -223,7 +266,9 @@
           if (
             typeof webApp.ready === "function"
           ) {
+
             webApp.ready();
+
           }
 
         } catch (e1) {}
@@ -235,7 +280,9 @@
           if (
             typeof webApp.expand === "function"
           ) {
+
             webApp.expand();
+
           }
 
         } catch (e2) {}
@@ -244,17 +291,47 @@
         // ------------------------------------------------------
         // AUTHENTICATED RAW INIT DATA
         // ------------------------------------------------------
+        // Primary source: Telegram.WebApp.initData.
+        // IMPORTANT: do not decode/rebuild this value.
+        // It must be forwarded exactly as Telegram supplied it.
+        // ------------------------------------------------------
 
-        var initData =
-          String(
-            webApp.initData || ""
-          ).trim();
+        var initData = "";
+
+        try {
+
+          initData =
+            String(
+              webApp.initData || ""
+            ).trim();
+
+        } catch (initDataError) {
+
+          initData = "";
+
+        }
+
+
+        // ------------------------------------------------------
+        // FALLBACK: TELEGRAM tgWebAppData
+        // ------------------------------------------------------
+        // Some Telegram WebView launches can expose the raw
+        // authenticated data through the URL/hash instead.
+        // Use it only when WebApp.initData is still empty.
+        // ------------------------------------------------------
+
+        if (!initData) {
+
+          initData =
+            getRJABLocationInitData();
+
+        }
 
 
         // ------------------------------------------------------
         // UNSAFE USER OBJECT
         // Used only to obtain the Telegram ID.
-        // Server validation still uses initData.
+        // Server validation still uses authenticated initData.
         // ------------------------------------------------------
 
         var user = null;
@@ -374,6 +451,7 @@
 
         };
 
+
       } catch (err) {
 
         return null;
@@ -381,6 +459,7 @@
       }
 
     }
+
 
 
     // ==========================================================
